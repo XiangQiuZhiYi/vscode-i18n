@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>i18n 管理器</title>
+        <style>
+            body {
+                font-family: var(--vscode-font-family);
+                font-size: var(--vscode-font-size);
+                color: var(--vscode-foreground);
+                background-color: var(--vscode-editor-background);
+                padding: 20px;
+            }
+
+            .header {
+                color: var(--vscode-foreground);
+                font-size: 1.4rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .header span {
+                font-size: 2rem;
+                font-weight: 600;
+            }
+
+            .container {
+                width: 95%;
+                margin: 0 auto;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                background-color: var(--vscode-editorWidget-background);
+                table-layout: fixed;
+            }
+
+            th,
+            td {
+                border: 1px solid var(--vscode-panel-border);
+                padding: 4px;
+                text-align: left;
+                flex: 1;
+            }
+
+            th {
+                background-color: var(--vscode-sideBarSectionHeader-background);
+                font-weight: bold;
+            }
+
+            tr:nth-child(even) {
+                background-color: var(--vscode-textBlockQuote-background);
+            }
+
+            button {
+                background-color: var(--vscode-button-background);
+                color: var(--vscode-button-foreground);
+                border: none;
+                padding: 6px 12px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 0.9em;
+            }
+
+            button:hover {
+                background-color: var(--vscode-button-hoverBackground);
+            }
+
+            .edit-btn {
+                background-color: var(--vscode-button-secondaryBackground);
+            }
+
+            .delete-btn {
+                background-color: var(--vscode-errorForeground);
+            }
+
+            #add-entry {
+                margin-top: 20px;
+            }
+
+            .config,
+            .table-header {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+            }
+            .abnormal {
+                color: var(--vscode-errorForeground);
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="container">
+            <div class="header">
+                <span> i18n 管理器 </span>
+                <div class="operation">
+                    <button id="refresh-btn">刷新数据</button>
+                    <button id="save-btn">保存数据</button>
+                </div>
+            </div>
+
+            <div class="config">
+                <span>提取语言的文件指向: </span>
+            </div>
+            <div id="extract-path"></div>
+            <hr />
+
+            <div class="config">
+                <span>lang的文件指向: </span>
+                <button id="switch-lang-path">更换文件指向</button>
+            </div>
+            <div id="lang-path"></div>
+            <hr />
+
+            <div class="table-header">
+                <span>提取文件所含文案：</span>
+                <button id="merge-entry" onclick="handleMerge">
+                    合并入数据
+                </button>
+            </div>
+            <table id="i18n-table">
+                <colgroup>
+                    <col style="width: auto" />
+                    <col style="width: auto" />
+                    <col style="width: auto" />
+                    <col style="width: 200px" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Key值</th>
+                        <th>中文</th>
+                        <th>英文</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Entries will be dynamically inserted here -->
+                </tbody>
+            </table>
+            <hr />
+
+            <div>lang文件所含文案：</div>
+            <table id="i18n-table-lang">
+                <colgroup>
+                    <col style="width: auto" />
+                    <col style="width: auto" />
+                    <col style="width: auto" />
+                    <col style="width: 200px" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Key值</th>
+                        <th>中文</th>
+                        <th>英文</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Entries will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
+        <script>
+            const vscode = acquireVsCodeApi();
+
+            document
+                .getElementById("refresh-btn")
+                .addEventListener("click", () => {
+                    vscode.postMessage({
+                        command: "refresh",
+                    });
+                });
+
+            document
+                .getElementById("merge-entry")
+                .addEventListener("click", () => {
+                    vscode.postMessage({
+                        command: "merge",
+                    });
+                });
+
+            document
+                .getElementById("switch-lang-path")
+                .addEventListener("click", () => {
+                    vscode.postMessage({
+                        command: "switchLangPath",
+                    });
+                });
+
+            document
+                .getElementById("save-btn")
+                .addEventListener("click", () => {
+                    vscode.postMessage({
+                        command: "save",
+                    });
+                });
+
+
+
+            function editEntry(key) {
+                vscode.postMessage({
+                    command: "edit",
+                    key: key,
+                });
+            }
+
+            function deleteEntry(key) {
+                vscode.postMessage({
+                    command: "delete",
+                    key: key,
+                });
+            }
+
+            // Handle messages from the extension
+            window.addEventListener("message", (event) => {
+                const message = event.data;
+                switch (message.command) {
+                    case "updateEntries":
+                        updateEntries(message.entries, message.langData);
+                        break;
+                    case "updateExtractPath":
+                        document.getElementById("extract-path").innerHTML =
+                            message.extractPath;
+                        break;
+                    case "updateLangPath":
+                        document.getElementById("lang-path").innerHTML =
+                            message.langFilePath;
+                        break;
+                    case "updateLangEntries":
+                        updateEntriesLang(message.langData, message.merge);
+                        break;
+                }
+            });
+
+            function updateEntries(entries, langData) {
+                entries.forEach((item) => {
+                    const list = langData.filter((e) => e.key === item.key);
+                    if (list.length > 0) {
+                        item.zh = list[0].zh;
+                        item.en = list[0].en;
+                    }
+                });
+
+                const sortArray = ((arr) => {
+                    return arr.sort((a, b) => {
+                        const aScore =
+                            (a.zh === "" ? 1 : 0) + (a.en === "" ? 2 : 0);
+                        const bScore =
+                            (b.zh === "" ? 1 : 0) + (b.en === "" ? 2 : 0);
+                        return bScore - aScore;
+                    });
+                })(entries);
+
+                const tbody = document.querySelector("#i18n-table tbody");
+                tbody.innerHTML = sortArray
+                    .map(
+                        (entry) => `
+                        <tr>
+                            <td>${entry.key}</td>
+                            <td>${entry.zh || ""}</td>
+                            <td>${entry.en || ""}</td>
+                            <td class="action-buttons">
+                                <button class="edit-btn" onclick="editEntry('${
+                                    entry.key
+                                }')">编辑</button>
+                                <button class="delete-btn" onclick="deleteEntry('${
+                                    entry.key
+                                }')">删除</button>
+                            </td>
+                        </tr>
+                    `
+                    )
+                    .join("");
+            }
+
+            function updateEntriesLang(langData, merge) {
+                const sortArray = ((arr) => {
+                    return arr.sort((a, b) => {
+                        const aScore =
+                            (a.zh === "" ? 1 : 0) + (a.en === "" ? 2 : 0);
+                        const bScore =
+                            (b.zh === "" ? 1 : 0) + (b.en === "" ? 2 : 0);
+                        return bScore - aScore;
+                    });
+                })(langData);
+
+                const abnormal = (str) => /_en$/.test(str);
+                if (merge) {
+                    const entries = document.querySelector("#i18n-table");
+                    entries.style.display = "none";
+                }
+                const tbody = document.querySelector("#i18n-table-lang tbody");
+                tbody.innerHTML = sortArray
+                    .map(
+                        (entry) => `
+                        <tr>
+                            <td>${entry.key}</td>
+                            <td>${entry.zh || ""}</td>
+                            <td class="${
+                                abnormal(entry.en) ? "abnormal" : null
+                            }">${entry.en || ""}</td>
+                            <td class="action-buttons">
+                                <button class="edit-btn" onclick="editEntry('${
+                                    entry.key
+                                }')">编辑</button>
+                                <button class="delete-btn" onclick="deleteEntry('${
+                                    entry.key
+                                }')">删除</button>
+                            </td>
+                        </tr>
+                    `
+                    )
+                    .join("");
+            }
+        </script>
+    </body>
+</html>

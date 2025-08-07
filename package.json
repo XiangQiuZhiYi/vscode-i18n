@@ -1,0 +1,79 @@
+{
+  "name": "vscode-i18n",
+  "displayName": "vscode-i18n",
+  "description": "A VSCode extension for extracting and managing i18n texts.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "vscode-i18n.extractI18n",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "vscode-i18n.extractI18n",
+          "when": "resourceLangId",
+          "group": "navigation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vscode-i18n.extractI18n",
+        "title": "提取i18n文案"
+      },
+      {
+        "command": "vscode-i18n.openI18nManager",
+        "title": "打开i18n管理器"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "i18n-manager",
+          "title": "i18n管理",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "i18n-manager": [
+        {
+          "id": "i18n-view",
+          "name": "i18n文案"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "yarn run lint",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.0",
+    "@babel/parser": "^7.23.0",
+    "@babel/traverse": "^7.23.0",
+    "@vue/compiler-sfc": "^3.5.18"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1"
+  }
+}
