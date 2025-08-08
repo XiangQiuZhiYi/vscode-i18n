@@ -46,6 +46,7 @@ class I18nManager {
         this.extractI18nData = [];
         this.langI18nData = [];
         this.langFilePath = ""; // 用于存储语言文件路径
+        this.extractFilePath = ""; // 用于存储提取文件路径
         this.initTreeView();
         this.initCommands(context);
     }
@@ -358,9 +359,6 @@ class I18nManager {
                     }
                 },
             });
-
-            console.log("--------------");
-
             // 使用 @babel/generator 生成更新后的代码
             const updatedCode = generate(ast, {
                 retainLines: false, // 不保持原始行号，使用格式化选项
@@ -388,6 +386,45 @@ class I18nManager {
     }
 
     /**
+     * 刷新数据 - 重新读取提取文件和语言文件的数据
+     */
+    refreshData(panel) {
+        try {
+            // 重新读取提取文件的数据
+            if (this.extractFilePath && fs.existsSync(this.extractFilePath)) {
+                this.extractI18nData = this.extractI18nFromFile(this.extractFilePath);
+            }
+
+            // 重新读取语言文件的数据
+            if (this.langFilePath && fs.existsSync(this.langFilePath)) {
+                this.langI18nData = this.extractDataFromLangFile(this.langFilePath);
+            }
+
+            console.log(this.extractI18nData, this.langI18nData, panel.webview.postMessage);
+            
+
+            // 发送更新后的数据到 Webview
+            panel.webview.postMessage({
+                command: "updateEntries",
+                entries: this.extractI18nData,
+                langData: this.langI18nData,
+            })
+
+            panel.webview.postMessage({
+                command: "updateLangEntries",
+                langData: this.langI18nData,
+                merge: false
+            });
+
+            vscode.window.showInformationMessage("数据刷新成功");
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `刷新数据失败: ${error.message}`
+            );
+        }
+    }
+
+    /**
      * 在文件内容中替换对象
      * @param {string} fileContent 文件内容
      * @param {Object} node AST 节点
@@ -408,7 +445,8 @@ class I18nManager {
     }
 
     openI18nManagerWebview(extractPath = "", langFilePath = "") {
-        // Store the lang file path
+        // Store the file paths
+        this.extractFilePath = extractPath;
         this.langFilePath = langFilePath;
         // Create and show a webview panel
         const panel = vscode.window.createWebviewPanel(
@@ -458,8 +496,8 @@ class I18nManager {
             (message) => {
                 switch (message.command) {
                     case "refresh":
-                        // Refresh functionality - for now just show an info message
-                        vscode.window.showInformationMessage("刷新功能待实现");
+                        // Refresh functionality
+                        this.refreshData(panel);
                         return;
                     case "add":
                         // Add functionality - for now just show an info message
@@ -483,6 +521,10 @@ class I18nManager {
                     case "save":
                         this.saveLangData();
                         return;
+                    case "log":
+                        console.log(message.data);
+                        return;
+
                 }
             },
             undefined,

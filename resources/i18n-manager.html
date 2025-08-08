@@ -199,8 +199,6 @@
                     });
                 });
 
-
-
             function editEntry(key) {
                 vscode.postMessage({
                     command: "edit",
@@ -215,6 +213,13 @@
                 });
             }
 
+            function log(data) {
+                vscode.postMessage({
+                    command: "log",
+                    data,
+                });
+            }
+
             // Handle messages from the extension
             window.addEventListener("message", (event) => {
                 const message = event.data;
@@ -222,16 +227,18 @@
                     case "updateEntries":
                         updateEntries(message.entries, message.langData);
                         break;
+                    case "updateLangEntries":
+                        updateEntriesLang(message.langData, message.merge);
+                        break;
                     case "updateExtractPath":
+                        extractPath = message.extractPath;
                         document.getElementById("extract-path").innerHTML =
                             message.extractPath;
                         break;
                     case "updateLangPath":
+                        langPath = message.langFilePath;
                         document.getElementById("lang-path").innerHTML =
                             message.langFilePath;
-                        break;
-                    case "updateLangEntries":
-                        updateEntriesLang(message.langData, message.merge);
                         break;
                 }
             });
@@ -254,7 +261,6 @@
                         return bScore - aScore;
                     });
                 })(entries);
-
                 const tbody = document.querySelector("#i18n-table tbody");
                 tbody.innerHTML = sortArray
                     .map(
@@ -292,6 +298,9 @@
                 if (merge) {
                     const entries = document.querySelector("#i18n-table");
                     entries.style.display = "none";
+                } else {
+                    const entries = document.querySelector("#i18n-table");
+                    entries.style.display = "table";
                 }
                 const tbody = document.querySelector("#i18n-table-lang tbody");
                 tbody.innerHTML = sortArray
