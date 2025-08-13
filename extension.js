@@ -239,11 +239,22 @@ class I18nManager {
             for (const key in cnObj) {
                 result.push({
                     key: key,
-                    value: cnObj[key], // 保持与现有数据结构一致
+                    value: cnObj[key], 
                     filePath: langFilePath,
-                    zh: cnObj[key],
-                    en: enObj[key] || key, // 如果没有对应的英文翻译，则使用key作为默认值
+                    zh: cnObj[key] || '',
+                    en: enObj[key] || '', 
                 });
+            }
+            for (const key in enObj) {
+                if(result.findIndex(item => item.key === key) === -1){
+                    result.push({
+                        key: key,
+                        value: cnObj[key],
+                        filePath: langFilePath,
+                        zh: cnObj[key] || '',
+                        en: enObj[key] || '', 
+                    });
+                }
             }
 
             return result;

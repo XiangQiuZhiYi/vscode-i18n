@@ -1,10 +1,10 @@
 <template>
   <div>
     <h1>{{ $t('用户登录') }}</h1>
-    <p>{{ $t('description.text') }}</p>
-    <button @click="handleClick">{{ $t('button.click') }}</button>
+    <p>{{ $t('请输入用户名') }}</p>
+    <button @click="handleClick">{{ $t('请输入密码') }}</button>
     <!-- 重复的 key -->
-    <span>{{ $t('welcome.message') }}</span>
+    <span>{{ $t('登录') }}</span>
   </div>
 </template>
 

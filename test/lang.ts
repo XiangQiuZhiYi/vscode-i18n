@@ -1,6 +1,5 @@
 import VueI18n from 'vue-i18n';
 const cn: VueI18n.LocaleMessageObject = {
-  "用户登录": "用户登录",
   "请输入用户名": "请输入用户名",
   "请输入密码": "请输入密码",
   "登录": "登录",
