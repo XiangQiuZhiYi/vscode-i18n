@@ -206,10 +206,11 @@
                 });
             }
 
-            function deleteEntry(key) {
+            function deleteEntry(key, type) {
                 vscode.postMessage({
                     command: "delete",
                     key: key,
+                    type: type,
                 });
             }
 
@@ -275,7 +276,7 @@
                                 }')">编辑</button>
                                 <button class="delete-btn" onclick="deleteEntry('${
                                     entry.key
-                                }')">删除</button>
+                                }', 'use')">删除</button>
                             </td>
                         </tr>
                     `
@@ -318,7 +319,7 @@
                                 }')">编辑</button>
                                 <button class="delete-btn" onclick="deleteEntry('${
                                     entry.key
-                                }')">删除</button>
+                                }', 'lang')">删除</button>
                             </td>
                         </tr>
                     `

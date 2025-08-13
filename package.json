@@ -39,15 +39,6 @@
         "title": "打开i18n管理器"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "i18n-manager",
-          "title": "i18n管理",
-          "icon": "resources/icon.svg"
-        }
-      ]
-    },
     "views": {
       "i18n-manager": [
         {

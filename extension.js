@@ -6,40 +6,6 @@ const traverse = require("@babel/traverse").default;
 const fs = require("fs");
 const path = require("path");
 
-class I18nTreeDataProvider {
-    constructor(i18nManager) {
-        this.i18nManager = i18nManager;
-        this._onDidChangeTreeData = new vscode.EventEmitter();
-        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
-    }
-
-    getTreeItem(element) {
-        return element;
-    }
-
-    getChildren(element) {
-        if (element) {
-            return Promise.resolve([]);
-        }
-
-        // Convert i18n entries to TreeItems
-        const treeItems = this.i18nManager.extractI18nData.map((entry) => {
-            const treeItem = new vscode.TreeItem(
-                `${entry.key}: ${entry.value}`
-            );
-            treeItem.tooltip = `Key: ${entry.key}\nValue: ${entry.value}\nFile: ${entry.filePath}`;
-            treeItem.contextValue = "i18nEntry";
-            return treeItem;
-        });
-
-        return Promise.resolve(treeItems);
-    }
-
-    refresh() {
-        this._onDidChangeTreeData.fire();
-    }
-}
-
 class I18nManager {
     constructor(context) {
         this.context = context;
@@ -47,17 +13,9 @@ class I18nManager {
         this.langI18nData = [];
         this.langFilePath = ""; // 用于存储语言文件路径
         this.extractFilePath = ""; // 用于存储提取文件路径
-        this.initTreeView();
         this.initCommands(context);
     }
 
-    initTreeView() {
-        this.treeDataProvider = new I18nTreeDataProvider(this);
-        this.treeView = vscode.window.createTreeView("i18n-view", {
-            treeDataProvider: this.treeDataProvider,
-        });
-        this.context.subscriptions.push(this.treeView);
-    }
 
     initCommands(context) {
         const extractCommand = vscode.commands.registerCommand(
@@ -76,7 +34,7 @@ class I18nManager {
                 if (!fs.existsSync(langFilePath)) {
                     langFilePath = false;
                 }
-                const i18nData = this.extractI18nFromFile(filePath);
+                this.extractI18nData = this.extractI18nFromFile(filePath);
 
                 // 如果存在语言文件，则读取其中的数据
                 if (langFilePath) {
@@ -84,7 +42,6 @@ class I18nManager {
                         this.extractDataFromLangFile(langFilePath);
                 }
                 // 不默认合并数据，而是将两种数据独立传递给 Webview
-                this.updateExtractI18nData(i18nData);
                 this.openI18nManagerWebview(filePath, langFilePath);
             }
         );
@@ -98,18 +55,6 @@ class I18nManager {
 
         context.subscriptions.push(extractCommand);
         context.subscriptions.push(openWebviewCommand);
-    }
-
-    updateExtractI18nData(data) {
-        this.extractI18nData = JSON.parse(JSON.stringify(data));
-        // Refresh the tree view
-        if (this.treeView) {
-            this.treeView.title = `i18n文案 (${this.extractI18nData.length})`;
-        }
-        // Emit event to refresh tree data provider
-        if (this.treeDataProvider) {
-            this.treeDataProvider.refresh();
-        }
     }
 
     async editEntry(key, panel) {
@@ -150,8 +95,6 @@ class I18nManager {
         // Also update the value field for backward compatibility
         entry.value = zhValue;
 
-        // Update the tree view
-        this.updateExtractI18nData(this.extractI18nData);
 
         // Transform extractI18nData to match the new table structure
         const tableEntries = this.extractI18nData.map((item) => ({
@@ -167,6 +110,42 @@ class I18nManager {
         });
 
         vscode.window.showInformationMessage(`已更新 "${key}" 的值`);
+    }
+
+    /**
+     * 删除条目
+     * @param {Object} message 要删除的条目的键
+     * @param {Object} panel Webview panel 对象
+     */
+    deleteEntry(message, panel) {
+        const { key, type } = message;
+        try {
+            if (type === "use") {
+                this.extractI18nData = this.extractI18nData.filter(
+                    (item) => item.key !== key
+                );
+                // 发送更新后的数据到 Webview
+                panel.webview.postMessage({
+                    command: "updateEntries",
+                    entries: this.extractI18nData,
+                    langData: this.langI18nData,
+                });
+            } else {
+                this.langI18nData = this.langI18nData.filter(
+                    (item) => item.key !== key
+                );
+                panel.webview.postMessage({
+                    command: "updateLangEntries",
+                    langData: this.langI18nData,
+                });
+            }
+
+            vscode.window.showInformationMessage(
+                `已删除 key 为 "${key}" 的条目`
+            );
+        } catch (error) {
+            vscode.window.showErrorMessage(`删除条目失败: ${error.message}`);
+        }
     }
 
     /**
@@ -239,20 +218,20 @@ class I18nManager {
             for (const key in cnObj) {
                 result.push({
                     key: key,
-                    value: cnObj[key], 
+                    value: cnObj[key],
                     filePath: langFilePath,
-                    zh: cnObj[key] || '',
-                    en: enObj[key] || '', 
+                    zh: cnObj[key] || "",
+                    en: enObj[key] || "",
                 });
             }
             for (const key in enObj) {
-                if(result.findIndex(item => item.key === key) === -1){
+                if (result.findIndex((item) => item.key === key) === -1) {
                     result.push({
                         key: key,
                         value: cnObj[key],
                         filePath: langFilePath,
-                        zh: cnObj[key] || '',
-                        en: enObj[key] || '', 
+                        zh: cnObj[key] || "",
+                        en: enObj[key] || "",
                     });
                 }
             }
@@ -317,7 +296,9 @@ class I18nManager {
                 plugins: ["typescript"],
             });
 
-            const langI18nDataCopy = JSON.parse(JSON.stringify(this.langI18nData));
+            const langI18nDataCopy = JSON.parse(
+                JSON.stringify(this.langI18nData)
+            );
             // 使用 @babel/traverse 遍历 AST，找到并更新 cn 和 en 对象
             traverse(ast, {
                 VariableDeclarator(path) {
@@ -328,7 +309,6 @@ class I18nManager {
                             path.node.init &&
                             path.node.init.type === "ObjectExpression"
                         ) {
-
                             path.node.init.properties = langI18nDataCopy.map(
                                 (item) => {
                                     return {
@@ -376,13 +356,14 @@ class I18nManager {
                 compact: false, // 不压缩代码
                 concise: false, // 不使用简洁格式
                 jsescOption: {
-                    minimal: true // 避免将中文转换为 Unicode 编码
+                    minimal: true, // 避免将中文转换为 Unicode 编码
                 },
-                indent: { // 设置缩进
-                    style: '  ', // 使用两个空格缩进
-                    base: 0 // 基础缩进为0
+                indent: {
+                    // 设置缩进
+                    style: "  ", // 使用两个空格缩进
+                    base: 0, // 基础缩进为0
                 },
-                comments: true // 保留注释
+                comments: true, // 保留注释
             }).code;
 
             // 将更新后的代码写回文件
@@ -403,35 +384,40 @@ class I18nManager {
         try {
             // 重新读取提取文件的数据
             if (this.extractFilePath && fs.existsSync(this.extractFilePath)) {
-                this.extractI18nData = this.extractI18nFromFile(this.extractFilePath);
+                this.extractI18nData = this.extractI18nFromFile(
+                    this.extractFilePath
+                );
             }
 
             // 重新读取语言文件的数据
             if (this.langFilePath && fs.existsSync(this.langFilePath)) {
-                this.langI18nData = this.extractDataFromLangFile(this.langFilePath);
+                this.langI18nData = this.extractDataFromLangFile(
+                    this.langFilePath
+                );
             }
 
-            console.log(this.extractI18nData, this.langI18nData, panel.webview.postMessage);
-            
+            console.log(
+                this.extractI18nData,
+                this.langI18nData,
+                panel.webview.postMessage
+            );
 
             // 发送更新后的数据到 Webview
             panel.webview.postMessage({
                 command: "updateEntries",
                 entries: this.extractI18nData,
                 langData: this.langI18nData,
-            })
+            });
 
             panel.webview.postMessage({
                 command: "updateLangEntries",
                 langData: this.langI18nData,
-                merge: false
+                merge: false,
             });
 
             vscode.window.showInformationMessage("数据刷新成功");
         } catch (error) {
-            vscode.window.showErrorMessage(
-                `刷新数据失败: ${error.message}`
-            );
+            vscode.window.showErrorMessage(`刷新数据失败: ${error.message}`);
         }
     }
 
@@ -519,10 +505,8 @@ class I18nManager {
                         this.editEntry(message.key, panel);
                         return;
                     case "delete":
-                        // Delete functionality - for now just show an info message
-                        vscode.window.showInformationMessage(
-                            `删除功能待实现: ${message.key}`
-                        );
+                        // Delete functionality
+                        this.deleteEntry(message, panel);
                         return;
                     case "merge":
                         this.mergeLangData(panel);
@@ -535,7 +519,6 @@ class I18nManager {
                     case "log":
                         console.log(message.data);
                         return;
-
                 }
             },
             undefined,
