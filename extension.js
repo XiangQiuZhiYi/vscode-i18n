@@ -16,7 +16,6 @@ class I18nManager {
         this.initCommands(context);
     }
 
-
     initCommands(context) {
         const extractCommand = vscode.commands.registerCommand(
             "vscode-i18n.extractI18n",
@@ -95,7 +94,6 @@ class I18nManager {
         // Also update the value field for backward compatibility
         entry.value = zhValue;
 
-
         // Transform extractI18nData to match the new table structure
         const tableEntries = this.extractI18nData.map((item) => ({
             key: item.key,
@@ -134,6 +132,11 @@ class I18nManager {
                 this.langI18nData = this.langI18nData.filter(
                     (item) => item.key !== key
                 );
+                panel.webview.postMessage({
+                    command: "updateEntries",
+                    entries: this.extractI18nData,
+                    langData: this.langI18nData,
+                });
                 panel.webview.postMessage({
                     command: "updateLangEntries",
                     langData: this.langI18nData,
@@ -242,6 +245,47 @@ class I18nManager {
                 `解析语言文件失败: ${error.message}`
             );
             return [];
+        }
+    }
+
+    /**
+     * 从 input 编辑条目
+     * @param {string} key 要编辑的条目的键
+     * @param {string} value 新的值
+     * @param {string} lang 语言 (zh 或 en)
+     * @param {Object} panel Webview panel 对象
+     */
+    editEntryFromInput(key, value, lang, panel) {
+        try {
+            // 更新 langI18nData
+            const langEntry = this.langI18nData.find(
+                (item) => item.key === key
+            );
+            if (langEntry) {
+                if (lang === "zh") {
+                    langEntry.zh = value;
+                } else if (lang === "en") {
+                    langEntry.en = value;
+                }
+            }
+
+            // 发送更新后的数据到 Webview
+            panel.webview.postMessage({
+                command: "updateEntries",
+                entries: this.extractI18nData,
+                langData: this.langI18nData,
+            });
+
+            panel.webview.postMessage({
+                command: "updateLangEntries",
+                langData: this.langI18nData,
+            });
+
+            // 不显示信息消息，因为这是自动编辑
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `从 input 编辑条目失败: ${error.message}`
+            );
         }
     }
 
@@ -512,9 +556,21 @@ class I18nManager {
                         this.mergeLangData(panel);
                         return;
                     case "switchLangPath":
+                        vscode.window.showInformationMessage(
+                            "更换文件指向功能待实现"
+                        );
                         return;
                     case "save":
                         this.saveLangData();
+                        return;
+                    case "editFromInput":
+                        // Edit functionality from input
+                        this.editEntryFromInput(
+                            message.key,
+                            message.value,
+                            message.lang,
+                            panel
+                        );
                         return;
                     case "log":
                         console.log(message.data);
