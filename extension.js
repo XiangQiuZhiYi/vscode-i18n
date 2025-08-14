@@ -3,6 +3,7 @@ const parser = require("@babel/parser");
 const generate = require("@babel/generator").default;
 const parseVue = require("@vue/compiler-sfc");
 const traverse = require("@babel/traverse").default;
+const t = require("@babel/types");
 const fs = require("fs");
 const path = require("path");
 
@@ -11,6 +12,7 @@ class I18nManager {
         this.context = context;
         this.extractI18nData = [];
         this.langI18nData = [];
+        this.originalLangI18nData = [];
         this.langFilePath = ""; // 用于存储语言文件路径
         this.extractFilePath = ""; // 用于存储提取文件路径
         this.initCommands(context);
@@ -39,6 +41,10 @@ class I18nManager {
                 if (langFilePath) {
                     this.langI18nData =
                         this.extractDataFromLangFile(langFilePath);
+                    // 原始数据存储
+                    this.originalLangI18nData = JSON.parse(
+                        JSON.stringify(this.langI18nData)
+                    );
                 }
                 // 不默认合并数据，而是将两种数据独立传递给 Webview
                 this.openI18nManagerWebview(filePath, langFilePath);
@@ -312,24 +318,73 @@ class I18nManager {
             }
         });
         this.langI18nData = langData;
+        this.extractI18nData = [];
+        panel.webview.postMessage({
+            command: "updateEntries",
+            entries: this.extractI18nData,
+            langData: this.langI18nData,
+        });
         panel.webview.postMessage({
             command: "updateLangEntries",
             langData,
-            merge: true,
         });
-
         vscode.window.showInformationMessage("数据合并完成");
+    }
+
+    compareLangArrays(a, b) {
+        const result = {
+            push: [],
+            zhEdit: [],
+            enEdit: [],
+            delete: [],
+        };
+
+        // 创建键集合
+        const aKeys = new Set(a.map((item) => item.key));
+        const bKeys = new Set(b.map((item) => item.key));
+
+        // 创建快速查找的映射
+        const aMap = new Map(a.map((item) => [item.key, item]));
+        const bMap = new Map(b.map((item) => [item.key, item]));
+
+        // 找出需要push的项（在b但不在a）
+        for (const key of bKeys) {
+            if (!aKeys.has(key)) {
+                result.push.push(bMap.get(key));
+            }
+        }
+
+        // 找出需要delete的项（在a但不在b）
+        for (const key of aKeys) {
+            if (!bKeys.has(key)) {
+                result.delete.push(aMap.get(key));
+            }
+        }
+
+        // 找出共同key但值不同的项
+        const commonKeys = new Set([...aKeys].filter((key) => bKeys.has(key)));
+        for (const key of commonKeys) {
+            const aItem = aMap.get(key);
+            const bItem = bMap.get(key);
+
+            if (aItem.zh !== bItem.zh) {
+                result.zhEdit.push(bItem);
+            }
+            if (aItem.en !== bItem.en) {
+                result.enEdit.push(bItem);
+            }
+        }
+        return result;
     }
 
     /**
      * 将 langI18nData 写回到语言文件中
      */
-    saveLangData() {
+    saveLangData(panel) {
         if (!this.langFilePath) {
             vscode.window.showErrorMessage("未指定语言文件路径");
             return;
         }
-
         try {
             // 读取原始文件内容
             const fileContent = fs.readFileSync(this.langFilePath, "utf-8");
@@ -340,8 +395,9 @@ class I18nManager {
                 plugins: ["typescript"],
             });
 
-            const langI18nDataCopy = JSON.parse(
-                JSON.stringify(this.langI18nData)
+            const result = this.compareLangArrays(
+                this.originalLangI18nData,
+                this.langI18nData
             );
             // 使用 @babel/traverse 遍历 AST，找到并更新 cn 和 en 对象
             traverse(ast, {
@@ -353,21 +409,40 @@ class I18nManager {
                             path.node.init &&
                             path.node.init.type === "ObjectExpression"
                         ) {
-                            path.node.init.properties = langI18nDataCopy.map(
-                                (item) => {
-                                    return {
-                                        type: "ObjectProperty",
-                                        key: {
-                                            type: "StringLiteral",
-                                            value: item.key,
-                                        },
-                                        value: {
-                                            type: "StringLiteral",
-                                            value: item.zh,
-                                        },
-                                    };
+                            const properties = path.node.init.properties;
+
+                            result.push.forEach((item) => {
+                                properties.push(
+                                    t.objectProperty(
+                                        t.stringLiteral(item.key),
+                                        t.stringLiteral(item.zh)
+                                    )
+                                );
+                            });
+                            result.zhEdit.forEach((item) => {
+                                const index = properties.findIndex(
+                                    (prop) =>
+                                        prop.key.value === item.key ||
+                                        prop.key.name === item.key
+                                );
+                                if (index !== -1) {
+                                    console.log(index, item.zh);
+
+                                    properties[index].value.value = item.zh;
                                 }
-                            );
+                            });
+                            result.delete.forEach((item) => {
+                                const index = properties.findIndex(
+                                    (prop) =>
+                                        prop.key.value === item.key ||
+                                        prop.key.name === item.key
+                                );
+                                if (index !== -1) {
+                                    properties.splice(index, 1);
+                                }
+                            });
+
+                            console.log(properties);
                         }
                     } else if (path.node.id.name === "en") {
                         // 更新 en 对象的属性
@@ -375,25 +450,42 @@ class I18nManager {
                             path.node.init &&
                             path.node.init.type === "ObjectExpression"
                         ) {
-                            path.node.init.properties = langI18nDataCopy.map(
-                                (item) => {
-                                    return {
-                                        type: "ObjectProperty",
-                                        key: {
-                                            type: "StringLiteral",
-                                            value: item.key,
-                                        },
-                                        value: {
-                                            type: "StringLiteral",
-                                            value: item.en,
-                                        },
-                                    };
+                            const properties = path.node.init.properties;
+
+                            result.push.forEach((item) => {
+                                properties.push(
+                                    t.objectProperty(
+                                        t.stringLiteral(item.key),
+                                        t.stringLiteral(item.en)
+                                    )
+                                );
+                            });
+                            result.zhEdit.forEach((item) => {
+                                const index = properties.findIndex(
+                                    (prop) =>
+                                        prop.key.value === item.key ||
+                                        prop.key.name === item.key
+                                );
+                                if (index !== -1) {
+                                    properties[index].value.value = item.en;
                                 }
-                            );
+                            });
+                            result.delete.forEach((item) => {
+                                const index = properties.findIndex(
+                                    (prop) =>
+                                        prop.key.value === item.key ||
+                                        prop.key.name === item.key
+                                );
+                                if (index !== -1) {
+                                    properties.splice(index, 1);
+                                }
+                            });
                         }
                     }
                 },
             });
+            console.log(ast);
+
             // 使用 @babel/generator 生成更新后的代码
             const updatedCode = generate(ast, {
                 retainLines: false, // 不保持原始行号，使用格式化选项
@@ -414,6 +506,8 @@ class I18nManager {
             fs.writeFileSync(this.langFilePath, updatedCode, "utf-8");
 
             vscode.window.showInformationMessage("语言文件保存成功");
+
+            this.refreshData(panel);
         } catch (error) {
             vscode.window.showErrorMessage(
                 `保存语言文件失败: ${error.message}`
@@ -438,14 +532,10 @@ class I18nManager {
                 this.langI18nData = this.extractDataFromLangFile(
                     this.langFilePath
                 );
+                this.originalLangI18nData = JSON.parse(
+                    JSON.stringify(this.langI18nData)
+                );
             }
-
-            console.log(
-                this.extractI18nData,
-                this.langI18nData,
-                panel.webview.postMessage
-            );
-
             // 发送更新后的数据到 Webview
             panel.webview.postMessage({
                 command: "updateEntries",
@@ -561,7 +651,7 @@ class I18nManager {
                         );
                         return;
                     case "save":
-                        this.saveLangData();
+                        this.saveLangData(panel);
                         return;
                     case "editFromInput":
                         // Edit functionality from input
@@ -622,7 +712,15 @@ class I18nManager {
             } else {
                 ast = parser.parse(fileContent, {
                     sourceType: "module",
-                    plugins: ["jsx", "typescript"],
+                    plugins: [
+                        "jsx",
+                        "typescript",
+                        "decorators-legacy", // 或 "decorators" 根据您的装饰器语法版本
+                        "classProperties", // 如果使用类属性
+                        "objectRestSpread", // 如果使用对象展开
+                    ],
+                    tokens: true, // 可选：保留token信息
+                    ranges: true, // 可选：保留范围信息
                 });
             }
             if (ast) {
@@ -645,6 +743,18 @@ class I18nManager {
                                     en: "",
                                 });
                             }
+                        } else if (
+                            path.node.callee.type === "MemberExpression" &&
+                            path.node.callee.property.name === "$t"
+                        ) {
+                            const key = path.node.arguments[0].value;
+                            i18nEntries.push({
+                                key,
+                                value: key,
+                                filePath: filePath,
+                                zh: "",
+                                en: "",
+                            });
                         }
                     },
                 });

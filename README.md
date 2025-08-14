@@ -1,65 +1,29 @@
 # vscode-i18n README
 
-This is the README for your extension "vscode-i18n". After writing up a brief description, we recommend including the following sections.
+## 功能
 
-## Features
+此扩展帮助您从 Vue.js 项目中提取和管理 i18n 文本。它提供以下功能：
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+1. **提取 i18n 文本**：自动从 Vue 文件中提取 i18n 文本。
+2. **管理 i18n 条目**：在视图中查看和管理提取的 i18n 条目。
+3. **编辑 i18n 条目**：直接在 Webview 面板中编辑 i18n 条目。
+4. **保存到语言文件**：将编辑的 i18n 条目保存到语言文件中。
+5. **刷新数据**：从源文件和语言文件中刷新数据。
+6. **删除条目**：删除不再需要的 i18n 条目。
 
-For example if there is an image subfolder under your extension project workspace:
+## 要求
 
-\!\[feature X\]\(images/feature-x.png\)
+- Visual Studio Code 版本 1.102.0 或更高
+- 使用 `$t()` 函数的 项目
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## 扩展设置
 
-## Requirements
+此扩展不添加任何 VS Code 设置。
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## 发布说明
 
-## Extension Settings
+### 0.0.1
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+vscode-i18n 扩展的初始版本，具有基本的 i18n 文本提取和管理功能。
 
 ---
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
