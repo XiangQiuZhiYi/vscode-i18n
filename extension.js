@@ -1,11 +1,14 @@
 const vscode = require("vscode");
 const parser = require("@babel/parser");
 const generate = require("@babel/generator").default;
-const parseVue = require("@vue/compiler-sfc");
 const traverse = require("@babel/traverse").default;
 const t = require("@babel/types");
 const fs = require("fs");
 const path = require("path");
+
+const { getDataForUse } = require("./utils/getDataForUse.js");
+const { getDataForLang } = require("./utils/getDataForLang.js");
+const { saveDataForLang } = require("./utils/saveDataForLang.js");
 
 class I18nManager {
     constructor(context) {
@@ -15,6 +18,7 @@ class I18nManager {
         this.originalLangI18nData = [];
         this.langFilePath = ""; // 用于存储语言文件路径
         this.extractFilePath = ""; // 用于存储提取文件路径
+        this.handleType = "";
         this.initCommands(context);
     }
 
@@ -22,6 +26,19 @@ class I18nManager {
         const extractCommand = vscode.commands.registerCommand(
             "vscode-i18n.extractI18n",
             async () => {
+                // 添加前置选项
+                const options = ["sis", "myth"];
+                const selectedOption = await vscode.window.showQuickPick(
+                    options,
+                    {
+                        placeHolder: "请选择执行路径",
+                    }
+                );
+                if (!selectedOption) {
+                    return; // 用户取消选择
+                }
+                this.handleType = selectedOption;
+
                 const editor = vscode.window.activeTextEditor;
                 if (!editor) {
                     vscode.window.showErrorMessage(
@@ -35,12 +52,14 @@ class I18nManager {
                 if (!fs.existsSync(langFilePath)) {
                     langFilePath = false;
                 }
-                this.extractI18nData = this.extractI18nFromFile(filePath);
+                this.extractI18nData = getDataForUse(filePath, this.handleType);
 
                 // 如果存在语言文件，则读取其中的数据
                 if (langFilePath) {
-                    this.langI18nData =
-                        this.extractDataFromLangFile(langFilePath);
+                    this.langI18nData = getDataForLang(
+                        langFilePath,
+                        this.handleType
+                    );
                     // 原始数据存储
                     this.originalLangI18nData = JSON.parse(
                         JSON.stringify(this.langI18nData)
@@ -154,103 +173,6 @@ class I18nManager {
             );
         } catch (error) {
             vscode.window.showErrorMessage(`删除条目失败: ${error.message}`);
-        }
-    }
-
-    /**
-     * 读取并解析语言文件，提取其中的中英文数据
-     * @param {string} langFilePath 语言文件路径
-     * @returns {Array} 包含中英文数据的数组
-     */
-    extractDataFromLangFile(langFilePath) {
-        if (!langFilePath || !fs.existsSync(langFilePath)) {
-            return [];
-        }
-
-        try {
-            // 读取文件内容
-            const fileContent = fs.readFileSync(langFilePath, "utf-8");
-
-            // 使用 @babel/parser 解析文件
-            const ast = parser.parse(fileContent, {
-                sourceType: "module",
-                plugins: ["typescript"],
-            });
-
-            // 初始化 cn 和 en 对象
-            const cnObj = {};
-            const enObj = {};
-
-            // 使用 @babel/traverse 遍历 AST
-            traverse(ast, {
-                VariableDeclarator(path) {
-                    // 查找 cn 和 en 变量声明
-                    if (path.node.id.name === "cn") {
-                        // 提取 cn 对象的属性
-                        if (
-                            path.node.init &&
-                            path.node.init.type === "ObjectExpression"
-                        ) {
-                            path.node.init.properties.forEach((prop) => {
-                                if (
-                                    prop.key &&
-                                    prop.value &&
-                                    prop.value.type === "StringLiteral"
-                                ) {
-                                    cnObj[prop.key.name || prop.key.value] =
-                                        prop.value.value;
-                                }
-                            });
-                        }
-                    } else if (path.node.id.name === "en") {
-                        // 提取 en 对象的属性
-                        if (
-                            path.node.init &&
-                            path.node.init.type === "ObjectExpression"
-                        ) {
-                            path.node.init.properties.forEach((prop) => {
-                                if (
-                                    prop.key &&
-                                    prop.value &&
-                                    prop.value.type === "StringLiteral"
-                                ) {
-                                    enObj[prop.key.name || prop.key.value] =
-                                        prop.value.value;
-                                }
-                            });
-                        }
-                    }
-                },
-            });
-            // 合并数据
-            const result = [];
-            for (const key in cnObj) {
-                result.push({
-                    key: key,
-                    value: cnObj[key],
-                    filePath: langFilePath,
-                    zh: cnObj[key] || "",
-                    en: enObj[key] || "",
-                });
-            }
-            for (const key in enObj) {
-                if (result.findIndex((item) => item.key === key) === -1) {
-                    result.push({
-                        key: key,
-                        value: cnObj[key],
-                        filePath: langFilePath,
-                        zh: cnObj[key] || "",
-                        en: enObj[key] || "",
-                    });
-                }
-            }
-
-            return result;
-        } catch (error) {
-            vscode.window.showErrorMessage(
-                `解析语言文件失败: ${error.message}`
-            );
-            return [];
         }
     }
 
@@ -380,138 +302,19 @@ class I18nManager {
     /**
      * 将 langI18nData 写回到语言文件中
      */
-    saveLangData(panel) {
-        if (!this.langFilePath) {
-            vscode.window.showErrorMessage("未指定语言文件路径");
-            return;
-        }
-        try {
-            // 读取原始文件内容
-            const fileContent = fs.readFileSync(this.langFilePath, "utf-8");
+    handleSave(panel) {
+        const result = this.compareLangArrays(
+            this.originalLangI18nData,
+            this.langI18nData
+        );
+        const bol = saveDataForLang({
+            result,
+            type: this.handleType,
+            langFilePath: this.langFilePath,
+        });
 
-            // 使用 @babel/parser 解析文件
-            const ast = parser.parse(fileContent, {
-                sourceType: "module",
-                plugins: ["typescript"],
-            });
-
-            const result = this.compareLangArrays(
-                this.originalLangI18nData,
-                this.langI18nData
-            );
-            // 使用 @babel/traverse 遍历 AST，找到并更新 cn 和 en 对象
-            traverse(ast, {
-                VariableDeclarator(path) {
-                    // 查找 cn 和 en 变量声明
-                    if (path.node.id.name === "cn") {
-                        // 更新 cn 对象的属性
-                        if (
-                            path.node.init &&
-                            path.node.init.type === "ObjectExpression"
-                        ) {
-                            const properties = path.node.init.properties;
-
-                            result.push.forEach((item) => {
-                                properties.push(
-                                    t.objectProperty(
-                                        t.stringLiteral(item.key),
-                                        t.stringLiteral(item.zh)
-                                    )
-                                );
-                            });
-                            result.zhEdit.forEach((item) => {
-                                const index = properties.findIndex(
-                                    (prop) =>
-                                        prop.key.value === item.key ||
-                                        prop.key.name === item.key
-                                );
-                                if (index !== -1) {
-                                    console.log(index, item.zh);
-
-                                    properties[index].value.value = item.zh;
-                                }
-                            });
-                            result.delete.forEach((item) => {
-                                const index = properties.findIndex(
-                                    (prop) =>
-                                        prop.key.value === item.key ||
-                                        prop.key.name === item.key
-                                );
-                                if (index !== -1) {
-                                    properties.splice(index, 1);
-                                }
-                            });
-
-                            console.log(properties);
-                        }
-                    } else if (path.node.id.name === "en") {
-                        // 更新 en 对象的属性
-                        if (
-                            path.node.init &&
-                            path.node.init.type === "ObjectExpression"
-                        ) {
-                            const properties = path.node.init.properties;
-
-                            result.push.forEach((item) => {
-                                properties.push(
-                                    t.objectProperty(
-                                        t.stringLiteral(item.key),
-                                        t.stringLiteral(item.en)
-                                    )
-                                );
-                            });
-                            result.zhEdit.forEach((item) => {
-                                const index = properties.findIndex(
-                                    (prop) =>
-                                        prop.key.value === item.key ||
-                                        prop.key.name === item.key
-                                );
-                                if (index !== -1) {
-                                    properties[index].value.value = item.en;
-                                }
-                            });
-                            result.delete.forEach((item) => {
-                                const index = properties.findIndex(
-                                    (prop) =>
-                                        prop.key.value === item.key ||
-                                        prop.key.name === item.key
-                                );
-                                if (index !== -1) {
-                                    properties.splice(index, 1);
-                                }
-                            });
-                        }
-                    }
-                },
-            });
-            console.log(ast);
-
-            // 使用 @babel/generator 生成更新后的代码
-            const updatedCode = generate(ast, {
-                retainLines: false, // 不保持原始行号，使用格式化选项
-                compact: false, // 不压缩代码
-                concise: false, // 不使用简洁格式
-                jsescOption: {
-                    minimal: true, // 避免将中文转换为 Unicode 编码
-                },
-                indent: {
-                    // 设置缩进
-                    style: "  ", // 使用两个空格缩进
-                    base: 0, // 基础缩进为0
-                },
-                comments: true, // 保留注释
-            }).code;
-
-            // 将更新后的代码写回文件
-            fs.writeFileSync(this.langFilePath, updatedCode, "utf-8");
-
-            vscode.window.showInformationMessage("语言文件保存成功");
-
+        if (bol) {
             this.refreshData(panel);
-        } catch (error) {
-            vscode.window.showErrorMessage(
-                `保存语言文件失败: ${error.message}`
-            );
         }
     }
 
@@ -522,15 +325,17 @@ class I18nManager {
         try {
             // 重新读取提取文件的数据
             if (this.extractFilePath && fs.existsSync(this.extractFilePath)) {
-                this.extractI18nData = this.extractI18nFromFile(
-                    this.extractFilePath
+                this.extractI18nData = getDataForUse(
+                    this.extractFilePath,
+                    this.handleType
                 );
             }
 
             // 重新读取语言文件的数据
             if (this.langFilePath && fs.existsSync(this.langFilePath)) {
-                this.langI18nData = this.extractDataFromLangFile(
-                    this.langFilePath
+                this.langI18nData = getDataForLang(
+                    this.langFilePath,
+                    this.handleType
                 );
                 this.originalLangI18nData = JSON.parse(
                     JSON.stringify(this.langI18nData)
@@ -651,7 +456,7 @@ class I18nManager {
                         );
                         return;
                     case "save":
-                        this.saveLangData(panel);
+                        this.handleSave(panel);
                         return;
                     case "editFromInput":
                         // Edit functionality from input
@@ -670,100 +475,6 @@ class I18nManager {
             undefined,
             this.context.subscriptions
         );
-    }
-
-    extractI18nFromFile(filePath) {
-        try {
-            const ext = path.extname(filePath);
-            let ast;
-            const fileContent = fs.readFileSync(filePath, "utf-8");
-            const i18nEntries = [];
-
-            if (ext === ".vue") {
-                const { descriptor } = parseVue.parse(fileContent);
-                if (descriptor.template) {
-                    const templateContent = descriptor.template.content;
-                    const tCallRegex = /\$t\(['"]([^'"]+)['"]\)/g;
-                    let match;
-                    while (
-                        (match = tCallRegex.exec(templateContent)) !== null
-                    ) {
-                        const key = match[1];
-                        i18nEntries.push({
-                            key,
-                            value: key,
-                            filePath: filePath,
-                            zh: "",
-                            en: "",
-                        });
-                    }
-                }
-                if (descriptor.script) {
-                    const scriptContent =
-                        descriptor.script?.content ||
-                        descriptor.scriptSetup?.content ||
-                        "";
-                    ast = parser.parse(scriptContent, {
-                        sourceType: "module",
-                        plugins: ["jsx", "typescript"],
-                        allowUndeclaredExports: true,
-                    });
-                }
-            } else {
-                ast = parser.parse(fileContent, {
-                    sourceType: "module",
-                    plugins: [
-                        "jsx",
-                        "typescript",
-                        "decorators-legacy", // 或 "decorators" 根据您的装饰器语法版本
-                        "classProperties", // 如果使用类属性
-                        "objectRestSpread", // 如果使用对象展开
-                    ],
-                    tokens: true, // 可选：保留token信息
-                    ranges: true, // 可选：保留范围信息
-                });
-            }
-            if (ast) {
-                traverse(ast, {
-                    CallExpression(path) {
-                        if (
-                            path.node.callee.type === "Identifier" &&
-                            path.node.callee.name === "$t"
-                        ) {
-                            if (
-                                path.node.arguments.length > 0 &&
-                                path.node.arguments[0].type === "StringLiteral"
-                            ) {
-                                const key = path.node.arguments[0].value;
-                                i18nEntries.push({
-                                    key,
-                                    value: key,
-                                    filePath: filePath,
-                                    zh: "",
-                                    en: "",
-                                });
-                            }
-                        } else if (
-                            path.node.callee.type === "MemberExpression" &&
-                            path.node.callee.property.name === "$t"
-                        ) {
-                            const key = path.node.arguments[0].value;
-                            i18nEntries.push({
-                                key,
-                                value: key,
-                                filePath: filePath,
-                                zh: "",
-                                en: "",
-                            });
-                        }
-                    },
-                });
-            }
-            return i18nEntries;
-        } catch (error) {
-            vscode.window.showErrorMessage(`解析文件失败: ${error.message}`);
-            return [];
-        }
     }
 }
 

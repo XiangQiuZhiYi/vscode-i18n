@@ -179,6 +179,7 @@
         </div>
         <script>
             const vscode = acquireVsCodeApi();
+            let langDataCache = [];
 
             document
                 .getElementById("refresh-btn")
@@ -212,12 +213,12 @@
                     });
                 });
 
-            function editEntryFromInput(key, value, lang) {
+            function editEntryFromInput(index, value, lang) {
                 vscode.postMessage({
                     command: "editFromInput",
-                    key: key,
+                    key: langDataCache[index].key,
                     value: value,
-                    lang: lang
+                    lang: lang,
                 });
             }
 
@@ -265,6 +266,14 @@
                         break;
                 }
             });
+
+            function escapeHtml(str) {
+                return str
+                    .replace(/"/g, "&quot;") // 转义双引号
+                    .replace(/'/g, "&apos;") // 转义单引号（可选）
+                    .replace(/</g, "&lt;") // 防御 XSS
+                    .replace(/>/g, "&gt;");
+            }
 
             function updateEntries(entries, langData) {
                 entries.forEach((item) => {
@@ -323,22 +332,23 @@
                     entries.style.display = "table";
                 }
                 const tbody = document.querySelector("#i18n-table-lang tbody");
+                langDataCache = sortArray;
                 tbody.innerHTML = sortArray
                     .map(
-                        (entry) => `
+                        (entry, index) => `
                         <tr>
                             <td>${entry.key}</td>
                             <td>
-                               <input class="lang-input" type="text" onchange="editEntryFromInput('${
-                                   entry.key
-                               }', this.value, 'zh')" value="${entry.zh}" />
+                               <input class="lang-input" type="text" onchange="editEntryFromInput('${index}', this.value, 'zh')" value="${escapeHtml(
+                            entry.zh
+                        )}" />
                                 </td>
                             <td class="${
                                 abnormal(entry.en) ? "abnormal" : null
                             }">
-                               <input class="lang-input" type="text" onchange="editEntryFromInput('${
-                                   entry.key
-                               }', this.value, 'en')" value="${entry.en}" />
+                               <input class="lang-input" type="text" onchange="editEntryFromInput('${index}', this.value, 'en')" value="${escapeHtml(
+                            entry.en
+                        )}" />
                             </td>
                             <td class="action-buttons">
                                 <button class="delete-btn" onclick="deleteEntry('${

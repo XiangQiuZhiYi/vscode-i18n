@@ -1,0 +1,35 @@
+<van-popup v-model="visible" round :close-on-click-overlay="false">
+  <div :class="styles.verifyDialog">
+    <h3 :class="styles.dialogTitle">{{$lang['重设密码']}}</h3>
+    <p :class="styles.verifyTip">{{$lang['请输入新密码']}}</p>
+
+    <van-field
+      v-model="formData.password"
+      :placeholder="$lang['请输入新密码']"
+      :type="showPassword ? 'text': 'password'"
+      :class="[styles.codeField, rules?.password?.error ? styles.errMessage : '']"
+      :style="{ '--text': `'${rules?.password?.message}'` }"
+      :right-icon="!showPassword ? 'closed-eye': 'eye-o'"
+      @click-right-icon="changeShowPassword"
+      clearable
+    />
+    <van-field
+      v-model="formData.confirmPassword"
+      :placeholder="$lang['请确认新密码']"
+      :type="showConfirmPassword ? 'text': 'password'"
+      :class="[styles.codeField, rules?.confirmPassword?.error ? styles.errMessage : '']"
+      :style="{ '--text': `'${rules?.confirmPassword?.message}'` }"
+      :right-icon="!showConfirmPassword ? 'closed-eye': 'eye-o'"
+      clearable
+      @click-right-icon="changeShowConfirmPassword"
+
+    />
+    {{$lang["adfd'db"]}}
+
+    <div :class="styles.btnGroup">
+      <div :class="styles.cancelBtn" @click="handleCancel">{{$lang['取消']}}</div>
+      <div :class="styles.confirmBtn" @click="handleConfirm">{{$lang['确定']}}</div>
+    </div>
+  </div>
+</van-popup>
+
