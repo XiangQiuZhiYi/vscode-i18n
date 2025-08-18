@@ -16,7 +16,7 @@
     <van-field
       v-model="formData.confirmPassword"
       :placeholder="$lang['请确认新密码']"
-      :type="showConfirmPassword ? 'text': 'password'"
+      :type="showConfirmPassword ? 'text': 'password'" 
       :class="[styles.codeField, rules?.confirmPassword?.error ? styles.errMessage : '']"
       :style="{ '--text': `'${rules?.confirmPassword?.message}'` }"
       :right-icon="!showConfirmPassword ? 'closed-eye': 'eye-o'"

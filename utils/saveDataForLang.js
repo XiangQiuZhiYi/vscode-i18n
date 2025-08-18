@@ -145,7 +145,7 @@ function sis(params) {
         }).code;
 
         // 将更新后的代码写回文件
-        fs.writeFileSync(this.langFilePath, updatedCode, "utf-8");
+        fs.writeFileSync(langFilePath, updatedCode, "utf-8");
 
         vscode.window.showInformationMessage("语言文件保存成功");
 
