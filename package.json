@@ -2,7 +2,7 @@
     "name": "flexible-i18n",
     "displayName": "flexible-i18n",
     "description": "A VSCode extension for extracting and managing i18n texts.",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "publisher": "Zhi-Yi",
     "repository": "private",
     "engines": {

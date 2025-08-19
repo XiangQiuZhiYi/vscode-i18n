@@ -109,6 +109,8 @@ function myth(filePath) {
     const dir = path.dirname(filePath);
     let langFilePathCn = path.join(dir, "lang.cn.js");
     let langFilePathEn = path.join(dir, "lang.en.js");
+    console.log("langFilePathCn", langFilePathCn, langFilePathEn);
+    
     const cnObj = {};
     const enObj = {};
     try {

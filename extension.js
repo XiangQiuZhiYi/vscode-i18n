@@ -49,11 +49,7 @@ class I18nManager {
                 const filePath = editor.document.uri.fsPath;
                 const dir = path.dirname(filePath);
                 let langFilePath = path.join(dir, "lang.ts");
-                if (!fs.existsSync(langFilePath)) {
-                    langFilePath = false;
-                }
                 this.extractI18nData = getDataForUse(filePath, this.handleType);
-
                 // 如果存在语言文件，则读取其中的数据
                 if (langFilePath) {
                     this.langI18nData = getDataForLang(
