@@ -16,6 +16,7 @@
 - Visual Studio Code 版本 1.102.0 或更高
 - 选择sis 使用 `$t()` 函数的 项目
 - 选择myth 使用 `$lang[]` 数组的项目
+- 选择react 使用 `t()` 函数的项目
 
 ## 扩展设置
 
@@ -25,4 +26,4 @@
 
 以下是如何使用此扩展的演示：
 
-<video src="使用方法.mov" controls></video>
+<img src="https://github.com/XiangQiuZhiYi/vscode-i18n/blob/main/Demonstration.gif" controls></img>

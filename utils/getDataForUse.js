@@ -11,8 +11,68 @@ function getDataForUse(filePath, type) {
             return sis(filePath);
         case "myth":
             return myth(filePath);
+        case "react":
+            return react(filePath);
         default:
             return [];
+    }
+}
+
+function react(filePath) {
+    try {
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        const i18nEntries = [];
+
+        const ast = parser.parse(fileContent, {
+            sourceType: "module",
+            plugins: [
+                "jsx",
+                "typescript",
+            ],
+            tokens: true, // 可选：保留token信息
+            ranges: true, // 可选：保留范围信息
+        });
+
+        if (ast) {
+            traverse(ast, {
+                CallExpression(path) {
+                    if (
+                        path.node.callee.type === "Identifier" &&
+                        path.node.callee.name === "t"
+                    ) {
+                        if (
+                            path.node.arguments.length > 0 &&
+                            path.node.arguments[0].type === "StringLiteral"
+                        ) {
+                            const key = path.node.arguments[0].value;
+                            i18nEntries.push({
+                                key,
+                                value: key,
+                                filePath: filePath,
+                                zh: "",
+                                en: "",
+                            });
+                        }
+                    } else if (
+                        path.node.callee.type === "MemberExpression" &&
+                        path.node.callee.property.name === "t"
+                    ) {
+                        const key = path.node.arguments[0].value;
+                        i18nEntries.push({
+                            key,
+                            value: key,
+                            filePath: filePath,
+                            zh: "",
+                            en: "",
+                        });
+                    }
+                },
+            });
+        }
+        return i18nEntries;
+    } catch (error) {
+        vscode.window.showErrorMessage(`解析文件失败: ${error.message}`);
+        return [];
     }
 }
 
@@ -125,7 +185,6 @@ function myth(filePath) {
             });
         }
         return matches;
-        
     } catch (error) {
         vscode.window.showErrorMessage(`解析文件失败: ${error.message}`);
         return [];
