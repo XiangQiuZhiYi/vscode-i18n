@@ -6,11 +6,11 @@ const path = require("path");
 
 function getDataForLang(langFilePath, type) {
     switch (type) {
-        case "sis":
+        case "$t()":
             return sis(langFilePath);
-        case "myth":
+        case "$lang[]":
             return myth(langFilePath);
-        case "react":
+        case "t()":
             return react(langFilePath);
         default:
             return [];

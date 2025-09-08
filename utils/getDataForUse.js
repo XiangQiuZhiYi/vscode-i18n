@@ -7,11 +7,11 @@ const path = require("path");
 
 function getDataForUse(filePath, type) {
     switch (type) {
-        case "sis":
+        case "$t()":
             return sis(filePath);
-        case "myth":
+        case "$lang[]":
             return myth(filePath);
-        case "react":
+        case "t()":
             return react(filePath);
         default:
             return [];
@@ -25,10 +25,7 @@ function react(filePath) {
 
         const ast = parser.parse(fileContent, {
             sourceType: "module",
-            plugins: [
-                "jsx",
-                "typescript",
-            ],
+            plugins: ["jsx", "typescript"],
             tokens: true, // 可选：保留token信息
             ranges: true, // 可选：保留范围信息
         });
@@ -87,10 +84,10 @@ function sis(filePath) {
             const { descriptor } = parseVue.parse(fileContent);
             if (descriptor.template) {
                 const templateContent = descriptor.template.content;
-                const tCallRegex = /\$t\(['"]([^'"]+)['"]\)/g;
+                const tCallRegex = /\$t\s*\(\s*(["'])(.*?)\1/g;
                 let match;
                 while ((match = tCallRegex.exec(templateContent)) !== null) {
-                    const key = match[1];
+                    const key = match[2];
                     i18nEntries.push({
                         key,
                         value: key,

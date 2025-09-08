@@ -27,7 +27,7 @@ class I18nManager {
             "vscode-i18n.extractI18n",
             async () => {
                 // 添加前置选项
-                const options = ["sis", "myth", "react"];
+                const options = ["$t()", "$lang[]", "t()"];
                 const selectedOption = await vscode.window.showQuickPick(
                     options,
                     {

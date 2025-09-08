@@ -9,11 +9,11 @@ const generate = require("@babel/generator").default;
 
 function saveDataForLang(params) {
     switch (params.type) {
-        case "sis":
+        case "$t()":
             return sis(params);
-        case "myth":
+        case "$lang[]":
             return myth(params);
-        case "react":
+        case "t()":
             return react(params);
         default:
             return [];
