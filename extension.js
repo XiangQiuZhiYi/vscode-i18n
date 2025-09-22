@@ -49,6 +49,9 @@ class I18nManager {
                 const filePath = editor.document.uri.fsPath;
                 const dir = path.dirname(filePath);
                 let langFilePath = path.join(dir, "lang.ts");
+                if (this.handleType === "$lang[]") {
+                    langFilePath = path.join(dir, "lang.cn.js");
+                }
                 this.extractI18nData = getDataForUse(filePath, this.handleType);
                 // 如果存在语言文件，则读取其中的数据
                 if (langFilePath) {
@@ -350,6 +353,11 @@ class I18nManager {
                 merge: false,
             });
 
+            panel.webview.postMessage({
+                command: "updateLangPath",
+                langFilePath:this.langFilePath,
+            });
+
             vscode.window.showInformationMessage("数据刷新成功");
         } catch (error) {
             vscode.window.showErrorMessage(`刷新数据失败: ${error.message}`);
@@ -374,6 +382,27 @@ class I18nManager {
             newObject +
             fileContent.substring(end)
         );
+    }
+
+    /**
+     * 切换语言文件路径
+     * @param {Object} panel Webview panel 对象
+     */
+    async switchLangPath(panel) {
+        const langFilePath = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            defaultUri: vscode.Uri.file(this.langFilePath),
+            filters: {
+                "JavaScript/TypeScript": ["js", "ts"],
+                JSON: ["json"],
+            },
+            openLabel: "选择语言文件",
+        });
+
+        this.langFilePath = langFilePath?.[0]?.path;
+        this.refreshData(panel);
     }
 
     openI18nManagerWebview(extractPath = "", langFilePath = "") {
@@ -447,9 +476,7 @@ class I18nManager {
                         this.mergeLangData(panel);
                         return;
                     case "switchLangPath":
-                        vscode.window.showInformationMessage(
-                            "更换文件指向功能待实现"
-                        );
+                        this.switchLangPath(panel);
                         return;
                     case "save":
                         this.handleSave(panel);

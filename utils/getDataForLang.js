@@ -139,10 +139,9 @@ function react(langFilePath) {
                         path.node.value.properties.forEach((prop) => {
                             if (
                                 prop.key &&
-                                prop.value &&
-                                prop.value.type === "StringLiteral"
+                                prop.value 
                             ) {
-                                cnObj[prop.key.name] = prop.value.value;
+                                cnObj[prop.key.name || prop.key.value] = prop.value.value;
                             }
                         });
                     }
@@ -155,10 +154,9 @@ function react(langFilePath) {
                         path.node.value.properties.forEach((prop) => {
                             if (
                                 prop.key &&
-                                prop.value &&
-                                prop.value.type === "StringLiteral"
+                                prop.value
                             ) {
-                                enObj[prop.key.name] = prop.value.value;
+                                enObj[prop.key.name || prop.key.value] = prop.value.value;
                             }
                         });
                     }
@@ -199,8 +197,6 @@ function myth(filePath) {
     const dir = path.dirname(filePath);
     let langFilePathCn = path.join(dir, "lang.cn.js");
     let langFilePathEn = path.join(dir, "lang.en.js");
-    console.log("langFilePathCn", langFilePathCn, langFilePathEn);
-    
     const cnObj = {};
     const enObj = {};
     try {
